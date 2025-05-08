@@ -6,13 +6,17 @@ export interface Question {
 
 export interface Assessment {
   id: string;
-  createdAt: Date;
+  title: string;
   questions: Question[];
+  createdAt: Date;
 }
+
+export type UserRole = 'user' | 'admin';
 
 export interface User {
   uid: string;
   email: string | null;
   displayName: string | null;
   photoURL: string | null;
+  role: UserRole;
 } 

@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { format } from 'date-fns';
 import type { Assessment } from '../types';
 
 const Dashboard = () => {
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
   const navigate = useNavigate();
+  const location = useLocation();
+  const { state } = location;
 
   useEffect(() => {
     const fetchAssessments = async () => {
@@ -23,6 +26,7 @@ const Dashboard = () => {
         setAssessments(assessmentList);
       } catch (error) {
         console.error('Error fetching assessments:', error);
+        setError('Failed to load assessments. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -41,6 +45,36 @@ const Dashboard = () => {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
+      {state?.score !== undefined && (
+        <div className="mb-6 rounded-md bg-green-50 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg
+                className="h-5 w-5 text-green-400"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-green-800">
+                Assessment Completed!
+              </h3>
+              <div className="mt-2 text-sm text-green-700">
+                <p>
+                  Your score: {state.score} out of {state.total} ({((state.score / state.total) * 100).toFixed(1)}%)
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="card">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-900">
@@ -53,6 +87,29 @@ const Dashboard = () => {
             Admin Dashboard
           </button>
         </div>
+
+        {error && (
+          <div className="mb-6 rounded-md bg-red-50 p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg
+                  className="h-5 w-5 text-red-400"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {assessments.length === 0 ? (
           <div className="text-center py-12">
@@ -73,6 +130,14 @@ const Dashboard = () => {
             <p className="mt-1 text-sm text-gray-500">
               Get started by creating a new assessment.
             </p>
+            <div className="mt-6">
+              <button
+                onClick={() => navigate('/admin')}
+                className="btn-primary"
+              >
+                Create Assessment
+              </button>
+            </div>
           </div>
         ) : (
           <div className="space-y-4">

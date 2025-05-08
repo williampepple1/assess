@@ -4,7 +4,7 @@ import { db } from '../config/firebase';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { Assessment, Question } from '../types';
 
-const Assessment = () => {
+const AssessmentPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [assessment, setAssessment] = useState<Assessment | null>(null);
@@ -12,7 +12,10 @@ const Assessment = () => {
   const [selectedAnswer, setSelectedAnswer] = useState<string>('');
   const [score, setScore] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
   const [shuffledOptions, setShuffledOptions] = useState<string[]>([]);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [isCorrect, setIsCorrect] = useState(false);
 
   useEffect(() => {
     const fetchAssessment = async () => {
@@ -26,11 +29,12 @@ const Assessment = () => {
           const data = docSnap.data() as Assessment;
           setAssessment(data);
         } else {
-          console.error('No such assessment exists!');
-          navigate('/dashboard');
+          setError('Assessment not found');
+          setTimeout(() => navigate('/dashboard'), 2000);
         }
       } catch (error) {
         console.error('Error fetching assessment:', error);
+        setError('Failed to load assessment. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -44,6 +48,8 @@ const Assessment = () => {
       const question = assessment.questions[currentQuestion];
       const options = [question.correctAnswer, ...question.options];
       setShuffledOptions(shuffleArray([...options]));
+      setSelectedAnswer('');
+      setShowFeedback(false);
     }
   }, [currentQuestion, assessment]);
 
@@ -59,22 +65,28 @@ const Assessment = () => {
     if (!assessment) return;
 
     const question = assessment.questions[currentQuestion];
-    if (selectedAnswer === question.correctAnswer) {
+    const correct = selectedAnswer === question.correctAnswer;
+    setIsCorrect(correct);
+    setShowFeedback(true);
+
+    if (correct) {
       setScore(score + 1);
     }
 
-    if (currentQuestion < assessment.questions.length - 1) {
-      setCurrentQuestion(currentQuestion + 1);
-      setSelectedAnswer('');
-    } else {
-      // Assessment completed
-      navigate('/dashboard', { 
-        state: { 
-          score, 
-          total: assessment.questions.length 
-        } 
-      });
-    }
+    // Wait for feedback to be shown before moving to next question
+    setTimeout(() => {
+      if (currentQuestion < assessment.questions.length - 1) {
+        setCurrentQuestion(currentQuestion + 1);
+      } else {
+        // Assessment completed
+        navigate('/dashboard', { 
+          state: { 
+            score, 
+            total: assessment.questions.length 
+          } 
+        });
+      }
+    }, 1500);
   };
 
   if (loading) {
@@ -85,14 +97,33 @@ const Assessment = () => {
     );
   }
 
-  if (!assessment) {
+  if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-900">Assessment not found</h2>
+          <div className="rounded-md bg-red-50 p-4 mb-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg
+                  className="h-5 w-5 text-red-400"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            </div>
+          </div>
           <button
             onClick={() => navigate('/dashboard')}
-            className="btn-primary mt-4"
+            className="btn-primary"
           >
             Return to Dashboard
           </button>
@@ -101,7 +132,12 @@ const Assessment = () => {
     );
   }
 
+  if (!assessment) {
+    return null;
+  }
+
   const question = assessment.questions[currentQuestion];
+  const progress = ((currentQuestion) / assessment.questions.length) * 100;
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
@@ -118,7 +154,7 @@ const Assessment = () => {
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div
               className="bg-primary-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${((currentQuestion) / assessment.questions.length) * 100}%` }}
+              style={{ width: `${progress}%` }}
             ></div>
           </div>
         </div>
@@ -130,9 +166,16 @@ const Assessment = () => {
             {shuffledOptions.map((option, index) => (
               <button
                 key={index}
-                onClick={() => setSelectedAnswer(option)}
+                onClick={() => !showFeedback && setSelectedAnswer(option)}
+                disabled={showFeedback}
                 className={`w-full p-4 text-left rounded-lg border transition-colors duration-200 ${
-                  selectedAnswer === option
+                  showFeedback
+                    ? option === question.correctAnswer
+                      ? 'border-green-500 bg-green-50'
+                      : selectedAnswer === option
+                      ? 'border-red-500 bg-red-50'
+                      : 'border-gray-200'
+                    : selectedAnswer === option
                     ? 'border-primary-500 bg-primary-50'
                     : 'border-gray-200 hover:border-primary-300'
                 }`}
@@ -142,11 +185,50 @@ const Assessment = () => {
             ))}
           </div>
 
+          {showFeedback && (
+            <div className={`rounded-md p-4 ${
+              isCorrect ? 'bg-green-50' : 'bg-red-50'
+            }`}>
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg
+                    className={`h-5 w-5 ${
+                      isCorrect ? 'text-green-400' : 'text-red-400'
+                    }`}
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    {isCorrect ? (
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                        clipRule="evenodd"
+                      />
+                    ) : (
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                        clipRule="evenodd"
+                      />
+                    )}
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className={`text-sm font-medium ${
+                    isCorrect ? 'text-green-800' : 'text-red-800'
+                  }`}>
+                    {isCorrect ? 'Correct!' : 'Incorrect. The correct answer is: ' + question.correctAnswer}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <button
             onClick={handleAnswer}
-            disabled={!selectedAnswer}
+            disabled={!selectedAnswer || showFeedback}
             className={`btn-primary w-full ${
-              !selectedAnswer ? 'opacity-50 cursor-not-allowed' : ''
+              (!selectedAnswer || showFeedback) ? 'opacity-50 cursor-not-allowed' : ''
             }`}
           >
             {currentQuestion < assessment.questions.length - 1 ? 'Next Question' : 'Finish Assessment'}
@@ -157,4 +239,4 @@ const Assessment = () => {
   );
 };
 
-export default Assessment; 
+export default AssessmentPage; 
