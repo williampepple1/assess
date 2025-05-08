@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../config/firebase';
 import { isAdmin } from '../utils/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -13,9 +14,7 @@ const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps)
   const navigate = useNavigate();
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const user = auth.currentUser;
-      
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         navigate('/login');
         return;
@@ -30,9 +29,9 @@ const ProtectedRoute = ({ children, requireAdmin = false }: ProtectedRouteProps)
       }
 
       setLoading(false);
-    };
+    });
 
-    checkAuth();
+    return () => unsubscribe();
   }, [navigate, requireAdmin]);
 
   if (loading) {

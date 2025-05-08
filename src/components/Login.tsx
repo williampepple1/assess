@@ -1,36 +1,67 @@
-import { useState } from 'react';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { useState, useEffect } from 'react';
+import { GoogleAuthProvider, signInWithRedirect, getRedirectResult, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { createUserProfile, getUserProfile } from '../utils/auth';
+import { useNavigate } from 'react-router-dom';
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        navigate('/dashboard');
+      }
+    });
+
+    return () => unsubscribe();
+  }, [navigate]);
+
+  useEffect(() => {
+    const handleRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result) {
+          console.log('Sign-in successful:', result);
+          const user = result.user;
+          
+          // Check if user profile exists
+          const userProfile = await getUserProfile(user.uid);
+          
+          // If no profile exists, create one
+          if (!userProfile) {
+            await createUserProfile(
+              user.uid,
+              user.email,
+              user.displayName,
+              user.photoURL
+            );
+          }
+        }
+      } catch (error: any) {
+        console.error('Detailed sign-in error:', {
+          code: error.code,
+          message: error.message,
+          fullError: error
+        });
+        setError(`Failed to sign in with Google: ${error.message}`);
+      }
+    };
+
+    handleRedirectResult();
+  }, []);
 
   const signInWithGoogle = async () => {
     setLoading(true);
     setError('');
     const provider = new GoogleAuthProvider();
     try {
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-      
-      // Check if user profile exists
-      const userProfile = await getUserProfile(user.uid);
-      
-      // If no profile exists, create one
-      if (!userProfile) {
-        await createUserProfile(
-          user.uid,
-          user.email,
-          user.displayName,
-          user.photoURL
-        );
-      }
-    } catch (error) {
-      console.error('Error signing in with Google:', error);
-      setError('Failed to sign in with Google. Please try again.');
-    } finally {
+      await signInWithRedirect(auth, provider);
+    } catch (error: any) {
+      console.error('Error initiating sign-in:', error);
+      setError(`Failed to sign in with Google: ${error.message}`);
       setLoading(false);
     }
   };
