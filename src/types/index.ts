@@ -18,6 +18,7 @@ export interface AssessmentResult {
   score: number;
   totalQuestions: number;
   completedAt: Date;
+  answers: string[];
 }
 
 export type UserRole = 'user' | 'admin';

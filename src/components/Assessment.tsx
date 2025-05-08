@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc, collection, addDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import type { Assessment, Question, AssessmentResult } from '../types';
 
 const AssessmentPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string>('');
@@ -16,31 +17,67 @@ const AssessmentPage = () => {
   const [shuffledOptions, setShuffledOptions] = useState<string[]>([]);
   const [showFeedback, setShowFeedback] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
+  const [userAnswers, setUserAnswers] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchAssessment = async () => {
       if (!id) {
+        console.error('No assessment ID provided');
         navigate('/dashboard');
+        return;
+      }
+
+      if (!auth.currentUser) {
+        console.error('No authenticated user');
+        navigate('/login');
         return;
       }
       
       try {
+        console.log('Fetching assessment with ID:', id);
         const docRef = doc(db, 'assessments', id);
         const docSnap = await getDoc(docRef);
         
-        if (docSnap.exists()) {
-          const data = {
-            id: docSnap.id,
-            ...docSnap.data(),
-            createdAt: docSnap.data().createdAt.toDate(),
-          } as Assessment;
-          setAssessment(data);
-        } else {
+        if (!docSnap.exists()) {
+          console.error('Assessment not found in database');
           setError('Assessment not found');
           setTimeout(() => navigate('/dashboard'), 2000);
+          return;
+        }
+
+        const data = {
+          id: docSnap.id,
+          ...docSnap.data(),
+          createdAt: docSnap.data().createdAt.toDate(),
+        } as Assessment;
+
+        console.log('Assessment data loaded:', data);
+        setAssessment(data);
+        setUserAnswers(new Array(data.questions.length).fill(''));
+
+        // Check if this is a retake after we have the assessment data
+        const isRetake = location.state?.isRetake;
+        if (isRetake) {
+          console.log('Handling retake for assessment:', id);
+          try {
+            const resultsQuery = query(
+              collection(db, 'assessmentResults'),
+              where('assessmentId', '==', id),
+              where('userId', '==', auth.currentUser.uid)
+            );
+            const resultsSnapshot = await getDocs(resultsQuery);
+            console.log('Found previous results:', resultsSnapshot.size);
+            
+            const deletePromises = resultsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+            await Promise.all(deletePromises);
+            console.log('Previous results deleted successfully');
+          } catch (deleteError) {
+            console.error('Error deleting previous results:', deleteError);
+            // Don't set error state here, as we still have the assessment data
+          }
         }
       } catch (error) {
-        console.error('Error fetching assessment:', error);
+        console.error('Error in fetchAssessment:', error);
         setError('Unable to load the assessment at this time');
       } finally {
         setLoading(false);
@@ -48,7 +85,7 @@ const AssessmentPage = () => {
     };
 
     fetchAssessment();
-  }, [id, navigate]);
+  }, [id, navigate, location.state]);
 
   useEffect(() => {
     if (assessment?.questions[currentQuestion]) {
@@ -78,7 +115,8 @@ const AssessmentPage = () => {
         userId: auth.currentUser.uid,
         score: finalScore,
         totalQuestions: assessment.questions.length,
-        completedAt: new Date()
+        completedAt: new Date(),
+        answers: userAnswers
       };
 
       await addDoc(collection(db, 'assessmentResults'), result);
@@ -94,6 +132,11 @@ const AssessmentPage = () => {
     const correct = selectedAnswer === question.correctAnswer;
     setIsCorrect(correct);
     setShowFeedback(true);
+
+    // Save the user's answer
+    const newAnswers = [...userAnswers];
+    newAnswers[currentQuestion] = selectedAnswer;
+    setUserAnswers(newAnswers);
 
     if (correct) {
       setScore(score + 1);
@@ -168,7 +211,7 @@ const AssessmentPage = () => {
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-gray-900">
-              Question {currentQuestion + 1} of {assessment.questions.length}
+              {location.state?.isRetake ? 'Retaking Assessment' : 'Question'} {currentQuestion + 1} of {assessment.questions.length}
             </h2>
             <span className="text-sm text-gray-500">
               Score: {score}/{currentQuestion}

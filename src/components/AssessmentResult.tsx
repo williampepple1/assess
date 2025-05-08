@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query, where, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -12,6 +12,7 @@ const AssessmentResultPage = () => {
   const [result, setResult] = useState<AssessmentResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
+  const [isRetaking, setIsRetaking] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -65,6 +66,13 @@ const AssessmentResultPage = () => {
 
     fetchData();
   }, [id, navigate]);
+
+  const handleRetake = () => {
+    if (!id || !auth.currentUser) return;
+    
+    // Navigate to assessment page with a retake flag
+    navigate(`/assessment/${id}`, { state: { isRetake: true } });
+  };
 
   if (loading) {
     return (
@@ -122,12 +130,21 @@ const AssessmentResultPage = () => {
           <h1 className="text-2xl font-bold text-gray-900">
             Assessment Results
           </h1>
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="btn-secondary"
-          >
-            Back to Dashboard
-          </button>
+          <div className="flex gap-4">
+            <button
+              onClick={handleRetake}
+              disabled={isRetaking}
+              className={`btn-primary ${isRetaking ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {isRetaking ? 'Starting Retake...' : 'Retake Assessment'}
+            </button>
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="btn-secondary"
+            >
+              Back to Dashboard
+            </button>
+          </div>
         </div>
 
         <div className="space-y-6">
@@ -159,21 +176,50 @@ const AssessmentResultPage = () => {
 
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Assessment Details
+              Question Review
             </h3>
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm text-gray-500">Total Questions</p>
-                <p className="text-lg font-medium text-gray-900">
-                  {assessment.questions.length}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Created On</p>
-                <p className="text-lg font-medium text-gray-900">
-                  {format(assessment.createdAt, 'PPP')}
-                </p>
-              </div>
+            <div className="space-y-6">
+              {assessment.questions.map((question, index) => (
+                <div key={index} className="border-b border-gray-200 pb-6 last:border-b-0 last:pb-0">
+                  <div className="flex items-start mb-4">
+                    <span className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-primary-100 text-primary-800 font-medium">
+                      {index + 1}
+                    </span>
+                    <div className="ml-4">
+                      <p className="text-lg font-medium text-gray-900">{question.question}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="ml-12 space-y-2">
+                    {question.options.map((option, optionIndex) => (
+                      <div
+                        key={optionIndex}
+                        className={`p-3 rounded-lg border ${
+                          option === question.correctAnswer
+                            ? 'border-green-500 bg-green-50'
+                            : option === result.answers?.[index]
+                            ? 'border-red-500 bg-red-50'
+                            : 'border-gray-200'
+                        }`}
+                      >
+                        <div className="flex items-center">
+                          {option === question.correctAnswer && (
+                            <svg className="h-5 w-5 text-green-500 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                          {option === result.answers?.[index] && option !== question.correctAnswer && (
+                            <svg className="h-5 w-5 text-red-500 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                          <span className="text-gray-900">{option}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

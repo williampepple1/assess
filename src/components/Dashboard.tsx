@@ -160,7 +160,7 @@ const Dashboard = () => {
                         onClick={() => navigate(`/assessment/${assessment.id}`)}
                         className="btn-primary"
                       >
-                        Start Assessment
+                        {result ? 'Retake Assessment' : 'Start Assessment'}
                       </button>
                       {result && (
                         <button
