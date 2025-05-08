@@ -3,6 +3,7 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import AssessmentPage from './components/Assessment';
 import AdminDashboard from './components/AdminDashboard';
+import AssessmentResultPage from './components/AssessmentResult';
 import ProtectedRoute from './components/ProtectedRoute';
 
 const App = () => {
@@ -23,6 +24,14 @@ const App = () => {
           element={
             <ProtectedRoute>
               <AssessmentPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/assessment/:id/result"
+          element={
+            <ProtectedRoute>
+              <AssessmentResultPage />
             </ProtectedRoute>
           }
         />

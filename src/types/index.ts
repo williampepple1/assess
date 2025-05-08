@@ -11,6 +11,15 @@ export interface Assessment {
   createdAt: Date;
 }
 
+export interface AssessmentResult {
+  id: string;
+  assessmentId: string;
+  userId: string;
+  score: number;
+  totalQuestions: number;
+  completedAt: Date;
+}
+
 export type UserRole = 'user' | 'admin';
 
 export interface User {

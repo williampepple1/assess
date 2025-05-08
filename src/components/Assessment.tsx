@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { doc, getDoc, collection, addDoc } from 'firebase/firestore';
+import { db, auth } from '../config/firebase';
 import { useParams, useNavigate } from 'react-router-dom';
-import type { Assessment, Question } from '../types';
+import type { Assessment, Question, AssessmentResult } from '../types';
 
 const AssessmentPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -19,14 +19,21 @@ const AssessmentPage = () => {
 
   useEffect(() => {
     const fetchAssessment = async () => {
-      if (!id) return;
+      if (!id) {
+        navigate('/dashboard');
+        return;
+      }
       
       try {
         const docRef = doc(db, 'assessments', id);
         const docSnap = await getDoc(docRef);
         
         if (docSnap.exists()) {
-          const data = docSnap.data() as Assessment;
+          const data = {
+            id: docSnap.id,
+            ...docSnap.data(),
+            createdAt: docSnap.data().createdAt.toDate(),
+          } as Assessment;
           setAssessment(data);
         } else {
           setError('Assessment not found');
@@ -34,7 +41,7 @@ const AssessmentPage = () => {
         }
       } catch (error) {
         console.error('Error fetching assessment:', error);
-        setError('Failed to load assessment. Please try again.');
+        setError('Unable to load the assessment at this time');
       } finally {
         setLoading(false);
       }
@@ -46,7 +53,8 @@ const AssessmentPage = () => {
   useEffect(() => {
     if (assessment?.questions[currentQuestion]) {
       const question = assessment.questions[currentQuestion];
-      const options = [question.correctAnswer, ...question.options];
+      const filteredOptions = question.options.filter(option => option !== question.correctAnswer);
+      const options = [question.correctAnswer, ...filteredOptions];
       setShuffledOptions(shuffleArray([...options]));
       setSelectedAnswer('');
       setShowFeedback(false);
@@ -59,6 +67,24 @@ const AssessmentPage = () => {
       [array[i], array[j]] = [array[j], array[i]];
     }
     return array;
+  };
+
+  const saveResult = async (finalScore: number) => {
+    if (!assessment || !auth.currentUser) return;
+
+    try {
+      const result: Omit<AssessmentResult, 'id'> = {
+        assessmentId: assessment.id,
+        userId: auth.currentUser.uid,
+        score: finalScore,
+        totalQuestions: assessment.questions.length,
+        completedAt: new Date()
+      };
+
+      await addDoc(collection(db, 'assessmentResults'), result);
+    } catch (error) {
+      console.error('Error saving result:', error);
+    }
   };
 
   const handleAnswer = () => {
@@ -74,17 +100,14 @@ const AssessmentPage = () => {
     }
 
     // Wait for feedback to be shown before moving to next question
-    setTimeout(() => {
+    setTimeout(async () => {
       if (currentQuestion < assessment.questions.length - 1) {
         setCurrentQuestion(currentQuestion + 1);
       } else {
         // Assessment completed
-        navigate('/dashboard', { 
-          state: { 
-            score, 
-            total: assessment.questions.length 
-          } 
-        });
+        const finalScore = correct ? score + 1 : score;
+        await saveResult(finalScore);
+        navigate(`/assessment/${id}/result`);
       }
     }, 1500);
   };

@@ -6,6 +6,7 @@ import type { Assessment } from '../types';
 
 const AdminDashboard = () => {
   const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const navigate = useNavigate();
@@ -27,6 +28,11 @@ const AdminDashboard = () => {
       return;
     }
 
+    if (!title.trim()) {
+      setError('Please enter an assessment title');
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -45,7 +51,7 @@ const AdminDashboard = () => {
         });
 
       const assessment: Omit<Assessment, 'id'> = {
-        title: file.name.replace('.csv', ''),
+        title: title.trim(),
         questions,
         createdAt: new Date()
       };
@@ -70,6 +76,20 @@ const AdminDashboard = () => {
             <div className="space-y-6">
               <div className="flex justify-center">
                 <div className="w-full max-w-lg">
+                  <div className="mb-6">
+                    <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
+                      Assessment Title
+                    </label>
+                    <input
+                      type="text"
+                      id="title"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="Enter assessment title"
+                    />
+                  </div>
+
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Upload Assessment (CSV)
                   </label>
@@ -152,7 +172,7 @@ const AdminDashboard = () => {
                 </button>
                 <button
                   onClick={handleUpload}
-                  disabled={!file || loading}
+                  disabled={!file || !title.trim() || loading}
                   className="btn-primary"
                 >
                   {loading ? (
