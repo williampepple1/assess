@@ -18,6 +18,8 @@ const AssessmentPage = () => {
   const [showFeedback, setShowFeedback] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
   const [userAnswers, setUserAnswers] = useState<string[]>([]);
+  const [timeLeft, setTimeLeft] = useState(30);
+  const [isTimeUp, setIsTimeUp] = useState(false);
 
   useEffect(() => {
     const fetchAssessment = async () => {
@@ -73,7 +75,6 @@ const AssessmentPage = () => {
             console.log('Previous results deleted successfully');
           } catch (deleteError) {
             console.error('Error deleting previous results:', deleteError);
-            // Don't set error state here, as we still have the assessment data
           }
         }
       } catch (error) {
@@ -86,6 +87,54 @@ const AssessmentPage = () => {
 
     fetchAssessment();
   }, [id, navigate, location.state]);
+
+  // Timer effect
+  useEffect(() => {
+    if (!assessment || showFeedback) return;
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setIsTimeUp(true);
+          handleTimeUp();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [currentQuestion, showFeedback, assessment]);
+
+  // Reset timer when moving to next question
+  useEffect(() => {
+    setTimeLeft(30);
+    setIsTimeUp(false);
+  }, [currentQuestion]);
+
+  const handleTimeUp = () => {
+    if (!assessment) return;
+
+    // Save empty answer for time up
+    const newAnswers = [...userAnswers];
+    newAnswers[currentQuestion] = '';
+    setUserAnswers(newAnswers);
+
+    setIsCorrect(false);
+    setShowFeedback(true);
+
+    // Move to next question after showing feedback
+    setTimeout(() => {
+      if (currentQuestion < assessment.questions.length - 1) {
+        setCurrentQuestion(currentQuestion + 1);
+      } else {
+        // Assessment completed
+        saveResult(score);
+        navigate(`/assessment/${id}/result`);
+      }
+    }, 1500);
+  };
 
   useEffect(() => {
     if (assessment?.questions[currentQuestion]) {
@@ -213,9 +262,11 @@ const AssessmentPage = () => {
             <h2 className="text-xl font-semibold text-gray-900">
               {location.state?.isRetake ? 'Retaking Assessment' : 'Question'} {currentQuestion + 1} of {assessment.questions.length}
             </h2>
-            <span className="text-sm text-gray-500">
-              Score: {score}/{currentQuestion}
-            </span>
+            <div className="flex items-center space-x-4">
+              <div className={`text-lg font-medium ${timeLeft <= 10 ? 'text-red-600' : 'text-gray-900'}`}>
+                Time Left: {timeLeft}s
+              </div>
+            </div>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div
@@ -283,7 +334,11 @@ const AssessmentPage = () => {
                   <p className={`text-sm font-medium ${
                     isCorrect ? 'text-green-800' : 'text-red-800'
                   }`}>
-                    {isCorrect ? 'Correct!' : 'Incorrect. The correct answer is: ' + question.correctAnswer}
+                    {isTimeUp 
+                      ? `Time's up! The correct answer is: ${question.correctAnswer}`
+                      : isCorrect 
+                        ? 'Correct!' 
+                        : `Incorrect. The correct answer is: ${question.correctAnswer}`}
                   </p>
                 </div>
               </div>
