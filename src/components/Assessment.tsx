@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { doc, getDoc, collection, addDoc, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import type { Assessment, Question, AssessmentResult } from '../types';
+import type { Assessment, AssessmentResult } from '../types';
 
 const AssessmentPage = () => {
   const { id } = useParams<{ id: string }>();

@@ -1,32 +1,15 @@
 import { useState, useEffect } from 'react';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 import type { Assessment, AssessmentResult } from '../types';
-import { isAdmin } from '../utils/auth';
 
 const Dashboard = () => {
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [results, setResults] = useState<Record<string, AssessmentResult>>({});
   const [loading, setLoading] = useState(true);
-  const [isUserAdmin, setIsUserAdmin] = useState(false);
   const [error, setError] = useState<string>('');
   const navigate = useNavigate();
-  const location = useLocation();
-  const { state } = location;
-
-  useEffect(() => {
-    const checkAdminStatus = async () => {
-      const user = auth.currentUser;
-      if (user) {
-        const admin = await isAdmin(user.uid);
-        setIsUserAdmin(admin);
-      }
-    };
-
-    checkAdminStatus();
-  }, []);
 
   useEffect(() => {
     const fetchData = async () => {

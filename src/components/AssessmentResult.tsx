@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc, collection, getDocs, query, where, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { db, auth } from '../config/firebase';
 import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -12,7 +12,6 @@ const AssessmentResultPage = () => {
   const [result, setResult] = useState<AssessmentResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
-  const [isRetaking, setIsRetaking] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -133,10 +132,9 @@ const AssessmentResultPage = () => {
           <div className="flex gap-4">
             <button
               onClick={handleRetake}
-              disabled={isRetaking}
-              className={`btn-primary ${isRetaking ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className="btn-primary"
             >
-              {isRetaking ? 'Starting Retake...' : 'Retake Assessment'}
+              Retake Assessment
             </button>
             <button
               onClick={() => navigate('/dashboard')}
